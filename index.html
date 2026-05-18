@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>考卷系統 - 管理員審核後台</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f6f9; }
+    .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+    button { cursor: pointer; border: none; border-radius: 4px; font-size: 16px; }
+    .login-btn { background-color: #333; color: white; }
+    .approve-btn { background-color: #28a745; color: white; width: auto; padding: 5px 15px; margin-right: 10px; }
+    .delete-btn { background-color: #dc3545; color: white; width: auto; padding: 5px 15px; }
+    .admin-item { border: 1px solid #ddd; background: #fafafa; padding: 15px; margin: 10px 0; border-radius: 6px; }
+  </style>
+</head>
+<body>
+
+  <h1>🔑 歷屆試題管理員審核後台</h1>
+
+  <div class="section" id="loginBox">
+    <h2>請先登入管理員帳號</h2>
+    <input type="email" id="adminEmail" placeholder="管理員信箱">
+    <input type="password" id="adminPassword" placeholder="密碼">
+    <button class="login-btn" onclick="login()">安全登入</button>
+  </div>
+
+  <div class="section" id="adminPanel" style="display: none;">
+    <h2>📥 待審核考卷列表</h2>
+    <button onclick="loadPending()" style="background-color: #6c757d; color: white; margin-bottom: 15px;">🔄 重新整理列表</button>
+    <div id="pendingList">載入中...</div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+    // 🔴 請在這裡替換成你自己的 Supabase 資料 🔴
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL'
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    // 1. 管理員登入
+    async function login() {
+      const email = document.getElementById('adminEmail').value.trim()
+      const password = document.getElementById('adminPassword').value
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (error) {
+        alert('登入失敗：' + error.message)
+      } else {
+        alert('管理員登入成功！')
+        document.getElementById('loginBox').style.display = 'none'
+        document.getElementById('adminPanel').style.display = 'block'
+        loadPending()
+      }
+    }
+    window.login = login
+
+    // 2. 載入未審核考卷
+    async function loadPending() {
+      const listDiv = document.getElementById('pendingList')
+      listDiv.innerHTML = '讀取中...'
+
+      const { data: papers, error } = await supabase
+        .from('past_papers')
+        .select('*')
+        .eq('approved', false)
+
+      if (error) {
+        listDiv.innerHTML = `<p style="color:red;">載入失敗：${error.message}</p>`
+        return
+      }
+
+      if (papers.length === 0) {
+        listDiv.innerHTML = '<p style="color:green; font-weight:bold;">🎉 目前沒有任何待審核的考卷。</p>'
+        return
+      }
+
+      listDiv.innerHTML = ''
+      papers.forEach(paper => {
+        const item = document.createElement('div')
+        item.className = 'admin-item'
+        item.innerHTML = `
+          <p><strong>科目：</strong>${paper.subject}</p>
+          <p><strong>年份：</strong>${paper.year} 年</p>
+          <p><a href="${paper.file_url}" target="_blank" style="color:#007bff;">👁️ 點此線上預覽檔案</a></p>
+          <button class="approve-btn" onclick="approvePaper(${paper.id})">✔ 通過審核 (公開)</button>
+          <button class="delete-btn" onclick="deletePaper(${paper.id}, '${paper.file_name}')">❌ 拒絕並刪除</button>
+        `
+        listDiv.appendChild(item)
+      })
+    }
+    window.loadPending = loadPending
+
+    // 3. 批准考卷
+    async function approvePaper(id) {
+      const { error } = await supabase
+        .from('past_papers')
+        .update({ approved: true })
+        .eq('id', id)
+
+      if (error) alert('操作失敗：' + error.message)
+      else {
+        alert('已成功批准！')
+        loadPending()
+      }
+    }
+    window.approvePaper = approvePaper
+
+    // 4. 刪除考卷
+    async function deletePaper(id, fileName) {
+      if (!confirm('確定要永久刪除這份考卷嗎？')) return
+
+      const { error: dbError } = await supabase
+        .from('past_papers')
+        .delete()
+        .eq('id', id)
+
+      if (dbError) {
+        alert('資料庫刪除失敗：' + dbError.message)
+        return
+      }
+
+      await supabase.storage
+        .from('papers-bucket')
+        .remove([`uploads/${fileName}`])
+
+      alert('已成功刪除該檔案！')
+      loadPending()
+    }
+    window.deletePaper = deletePaper
+
+  </script>
+</body>
+</html>
