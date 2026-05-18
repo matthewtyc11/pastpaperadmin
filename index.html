@@ -1,56 +1,58 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>考卷系統 - 管理員審核後台</title>
+  <title>Admin Review & Edit Panel</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f6f9; }
     .section { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    input, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
-    button { cursor: pointer; border: none; border-radius: 4px; font-size: 16px; }
+    input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+    button { cursor: pointer; border: none; border-radius: 4px; font-size: 15px; font-weight: bold; }
     .login-btn { background-color: #333; color: white; }
-    .approve-btn { background-color: #28a745; color: white; width: auto; padding: 5px 15px; margin-right: 10px; }
-    .delete-btn { background-color: #dc3545; color: white; width: auto; padding: 5px 15px; }
-    .admin-item { border: 1px solid #ddd; background: #fafafa; padding: 15px; margin: 10px 0; border-radius: 6px; }
+    .action-btn { width: auto; padding: 6px 15px; margin-right: 8px; color: white; }
+    .approve-btn { background-color: #28a745; }
+    .edit-btn { background-color: #ffc107; color: #212529; }
+    .save-btn { background-color: #17a2b8; }
+    .delete-btn { background-color: #dc3545; }
+    .admin-item { border: 1px solid #ddd; background: #fafafa; padding: 15px; margin: 10px 0; border-radius: 6px; line-height: 1.6; }
+    .edit-box { background: #e9ecef; padding: 10px; border-radius: 4px; margin-top: 10px; }
+    .hidden-input { display: none; background-color: #fff; border: 1px solid #aaa; }
   </style>
 </head>
 <body>
 
-  <h1>🔑 歷屆試題管理員審核後台</h1>
+  <h1>🔑 Past Paper Full-Control Admin Panel</h1>
 
   <div class="section" id="loginBox">
-    <h2>請先登入管理員帳號</h2>
-    <input type="email" id="adminEmail" placeholder="管理員信箱">
-    <input type="password" id="adminPassword" placeholder="密碼">
-    <button class="login-btn" onclick="login()">安全登入</button>
+    <h2>Admin Access Verification</h2>
+    <input type="email" id="adminEmail" placeholder="Admin Email">
+    <input type="password" id="adminPassword" placeholder="Password">
+    <button class="login-btn" onclick="login()">Secure Login</button>
   </div>
 
   <div class="section" id="adminPanel" style="display: none;">
-    <h2>📥 待審核考卷列表</h2>
-    <button onclick="loadPending()" style="background-color: #6c757d; color: white; margin-bottom: 15px;">🔄 重新整理列表</button>
-    <div id="pendingList">載入中...</div>
+    <h2>📥 Pending Review Submissions</h2>
+    <button onclick="loadPending()" style="background-color: #6c757d; color: white; margin-bottom: 15px;">🔄 Refresh Queue List</button>
+    <div id="pendingList">Loading...</div>
   </div>
 
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-    // 🔴 請在這裡替換成你自己的 Supabase 資料 🔴
-    const SUPABASE_URL = 'https://lltyalimcdwsmkvocnvp.supabase.co/'
+    const SUPABASE_URL = 'https://lltyalimcdwsmkvocnvp.supabase.co'
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxsdHlhbGltY2R3c21rdm9jbnZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjY5NjksImV4cCI6MjA5NDYwMjk2OX0.3MBcS3chUFQXm8PX0rYDiVY98oXaSu3uqGY-Qzm8qIU'
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-    // 1. 管理員登入
     async function login() {
       const email = document.getElementById('adminEmail').value.trim()
       const password = document.getElementById('adminPassword').value
-
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
-        alert('登入失敗：' + error.message)
+        alert('Login failed: ' + error.message)
       } else {
-        alert('管理員登入成功！')
+        alert('Admin Authorized Successfully!')
         document.getElementById('loginBox').style.display = 'none'
         document.getElementById('adminPanel').style.display = 'block'
         loadPending()
@@ -58,23 +60,24 @@
     }
     window.login = login
 
-    // 2. 載入未審核考卷
+    // Load Pending Review Items
     async function loadPending() {
       const listDiv = document.getElementById('pendingList')
-      listDiv.innerHTML = '讀取中...'
+      listDiv.innerHTML = 'Fetching data queue...'
 
       const { data: papers, error } = await supabase
         .from('past_papers')
         .select('*')
         .eq('approved', false)
+        .order('created_at', { ascending: true })
 
       if (error) {
-        listDiv.innerHTML = `<p style="color:red;">載入失敗：${error.message}</p>`
+        listDiv.innerHTML = `<p style="color:red;">Error fetching: ${error.message}</p>`
         return
       }
 
       if (papers.length === 0) {
-        listDiv.innerHTML = '<p style="color:green; font-weight:bold;">🎉 目前沒有任何待審核的考卷。</p>'
+        listDiv.innerHTML = '<p style="color:green; font-weight:bold;">🎉 Hooray! No pending papers to review.</p>'
         return
       }
 
@@ -82,36 +85,145 @@
       papers.forEach(paper => {
         const item = document.createElement('div')
         item.className = 'admin-item'
+        item.id = `item-${paper.id}`
         item.innerHTML = `
-          <p><strong>科目：</strong>${paper.subject}</p>
-          <p><strong>年份：</strong>${paper.year} 年</p>
-          <p><a href="${paper.file_url}" target="_blank" style="color:#007bff;">👁️ 點此線上預覽檔案</a></p>
-          <button class="approve-btn" onclick="approvePaper(${paper.id})">✔ 通過審核 (公開)</button>
-          <button class="delete-btn" onclick="deletePaper(${paper.id}, '${paper.file_name}')">❌ 拒絕並刪除</button>
+          <div>
+            <strong>【Document Meta Details】</strong><br>
+            <strong>Subject:</strong> <span id="txt-sub-${paper.id}">${paper.subject}</span> | 
+            <strong>Term:</strong> Term <span id="txt-term-${paper.id}">${paper.term}</span> | 
+            <strong>Year:</strong> <span id="txt-year-${paper.id}">${paper.year}</span><br>
+            <strong>Uploader Profile:</strong> <span id="txt-user-${paper.id}">${paper.uploader}</span><br>
+            <a href="${paper.file_url}" target="_blank" style="color:#007bff; font-weight:bold;">👁️ Click here to preview student's uploaded file</a>
+          </div>
+          <div style="margin-top: 10px;">
+            <button class="action-btn approve-btn" onclick="approvePaper(${paper.id})">✔ Approve & Publicize</button>
+            <button class="action-btn edit-btn" onclick="showEditForm(${paper.id})">✏️ Modify Records</button>
+            <button class="action-btn delete-btn" onclick="deletePaper(${paper.id}, '${paper.file_name}')">❌ Decline & Wipe</button>
+          </div>
+          <div id="edit-box-${paper.id}" class="edit-box" style="display:none;"></div>
         `
         listDiv.appendChild(item)
       })
     }
     window.loadPending = loadPending
 
-    // 3. 批准考卷
+    // Handle Admin Triggered Edit Area
+    function showEditForm(id) {
+      const box = document.getElementById(`edit-box-${id}`)
+      if(box.style.display === 'block') {
+        box.style.display = 'none'
+        return
+      }
+      
+      const currentSub = document.getElementById(`txt-sub-${id}`).innerText
+      const currentTerm = document.getElementById(`txt-term-${id}`).innerText
+      const currentYear = document.getElementById(`txt-year-${id}`).innerText
+      const currentUser = document.getElementById(`txt-user-${id}`).innerText
+
+      const standardSubjects = ['Maths', 'English', 'Chinese', 'Science', 'Physics', 'Chemistry', 'Biology', 'History', 'Geography']
+      const isCustomSubject = !standardSubjects.includes(currentSub)
+
+      let yearOptions = ''
+      for (let y = 2026; y >= 2020; y--) {
+        yearOptions += `<option value="${y}" ${y==currentYear?'selected':''}>${y}</option>`
+      }
+
+      box.innerHTML = `
+        <h3>✏️ Adjust Metadata Information</h3>
+        <label>Subject:</label>
+        <select id="edit-sub-${id}" onchange="toggleAdminOther(${id})">
+          <option value="Maths" ${currentSub=='Maths'?'selected':''}>Maths</option>
+          <option value="English" ${currentSub=='English'?'selected':''}>English</option>
+          <option value="Chinese" ${currentSub=='Chinese'?'selected':''}>Chinese</option>
+          <option value="Science" ${currentSub=='Science'?'selected':''}>Science</option>
+          <option value="Physics" ${currentSub=='Physics'?'selected':''}>Physics</option>
+          <option value="Chemistry" ${currentSub=='Chemistry'?'selected':''}>Chemistry</option>
+          <option value="Biology" ${currentSub=='Biology'?'selected':''}>Biology</option>
+          <option value="History" ${currentSub=='History'?'selected':''}>History</option>
+          <option value="Geography" ${currentSub=='Geography'?'selected':''}>Geography</option>
+          <option value="Other" ${isCustomSubject?'selected':''}>Other (Custom Input)</option>
+        </select>
+        
+        <input type="text" id="edit-other-sub-${id}" class="hidden-input" value="${currentSub}" style="display: ${isCustomSubject?'block':'none'}">
+
+        <label>Term:</label>
+        <select id="edit-term-${id}">
+          <option value="1" ${currentTerm=='1'?'selected':''}>1</option>
+          <option value="2" ${currentTerm=='2'?'selected':''}>2</option>
+          <option value="3" ${currentTerm=='3'?'selected':''}>3</option>
+        </select>
+        
+        <label>Year:</label>
+        <select id="edit-year-${id}">${yearOptions}</select>
+        
+        <label>Uploader Profile Identity:</label>
+        <input type="text" id="edit-user-${id}" value="${currentUser}">
+        <button class="action-btn save-btn" onclick="saveEdit(${id})" style="width:100%; margin-top:10px;">💾 Save Modifications</button>
+      `
+      box.style.display = 'block'
+    }
+    window.showEditForm = showEditForm
+
+    // Admin Panel Helper logic for Custom Subject Inputs
+    function toggleAdminOther(id) {
+      const selectVal = document.getElementById(`edit-sub-${id}`).value
+      const inputEl = document.getElementById(`edit-other-sub-${id}`)
+      inputEl.style.display = (selectVal === 'Other') ? 'block' : 'none'
+    }
+    window.toggleAdminOther = toggleAdminOther
+
+    // Push Updated Edits to Cloud Supabase Table
+    async function saveEdit(id) {
+      let newSub = document.getElementById(`edit-sub-${id}`).value
+      if (newSub === 'Other') {
+        newSub = document.getElementById(`edit-other-sub-${id}`).value.trim()
+        if(!newSub) {
+          alert('Custom subject name cannot be blank.')
+          return
+        }
+      }
+      
+      const newTerm = document.getElementById(`edit-term-${id}`).value
+      const newYear = document.getElementById(`edit-year-${id}`).value
+      const newUser = document.getElementById(`edit-user-${id}`).value.trim()
+
+      const { error } = await supabase
+        .from('past_papers')
+        .update({
+          subject: newSub,
+          term: newTerm,
+          year: parseInt(newYear),
+          uploader: newUser || 'Anonymous'
+        })
+        .eq('id', id)
+
+      if (error) {
+        alert('Update transaction error: ' + error.message)
+      } else {
+        alert('💾 Data fields synced up to cloud cluster successfully!')
+        loadPending()
+      }
+    }
+    window.saveEdit = saveEdit
+
+    // Approve Command
     async function approvePaper(id) {
       const { error } = await supabase
         .from('past_papers')
         .update({ approved: true })
         .eq('id', id)
 
-      if (error) alert('操作失敗：' + error.message)
+      if (error) alert('Approval sequence failed: ' + error.message)
       else {
-        alert('已成功批准！')
+        alert('Paper asset approved and released onto client page!')
         loadPending()
       }
     }
     window.approvePaper = approvePaper
 
-    // 4. 刪除考卷
+    // Delete Command
     async function deletePaper(id, fileName) {
-      if (!confirm('確定要永久刪除這份考卷嗎？')) return
+      if (!confirm('Are you absolutely sure you want to drop this submission?')) return
 
       const { error: dbError } = await supabase
         .from('past_papers')
@@ -119,7 +231,7 @@
         .eq('id', id)
 
       if (dbError) {
-        alert('資料庫刪除失敗：' + dbError.message)
+        alert('Database query dropped failed: ' + dbError.message)
         return
       }
 
@@ -127,11 +239,10 @@
         .from('papers-bucket')
         .remove([`uploads/${fileName}`])
 
-      alert('已成功刪除該檔案！')
+      alert('Asset clean-up sequence completed.')
       loadPending()
     }
     window.deletePaper = deletePaper
-
   </script>
 </body>
 </html>
